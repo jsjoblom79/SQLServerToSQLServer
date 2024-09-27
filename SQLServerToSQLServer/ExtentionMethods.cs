@@ -33,6 +33,14 @@ namespace SQLServerToSQLServer
             return $"USE [{databaseName}]\nGO\n{statement}";
         }
 
+        public static string AddGoBetweenBatch(this string statement)
+        {
+            if(statement.StartsWith("IF NOT EXISTS"))
+            {
+                return statement + "\nGO\n";
+            }
+            return statement;
+        }
         public static string AddNewLine(this string statement)
         {
             if (!statement.EndsWith("\r\n"))

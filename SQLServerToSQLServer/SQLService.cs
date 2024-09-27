@@ -16,10 +16,13 @@ namespace SQLServerToSQLServer
     {
         private static string? _connectionString;
         private static int _errorCount;
-        public static void CopySQLInstance(string fromServer,string toServer)
+        private static string? _directory;
+        public static void CopySQLInstance(string fromServer,string toServer, string directory)
         {
             string connectionString = $"Server={fromServer};Database=master;Integrated Security=True;Trust Server Certificate=True;";
             SetToServerConnectionString($"Server={toServer};Database=master;Integrated Security=True;Trust Server Certificate=True;");
+            _directory = directory;
+            
             using (SqlConnection sqlConnection = new SqlConnection(connectionString))
             {
                 ServerConnection serverConnection = new ServerConnection(sqlConnection);
@@ -29,6 +32,7 @@ namespace SQLServerToSQLServer
                 {
                     if (!db.IsSystemObject)
                     {
+                        CreateDBFolderForErrors(db);
                         if(db.Status == DatabaseStatus.Offline)
                         {
                             db.SetOnline();
@@ -124,7 +128,7 @@ namespace SQLServerToSQLServer
                             if(_errorCount > 0)
                             {
                                 Console.ForegroundColor = ConsoleColor.Red;
-                                Console.WriteLine($"Check the Log file for errors.");
+                                Console.WriteLine($"Check the Log file for errors. Error Count for {db.Name} was {_errorCount}");
                                 Console.ForegroundColor = ConsoleColor.DarkCyan;
                             }
                         }
@@ -143,19 +147,23 @@ namespace SQLServerToSQLServer
                 procedures = procedures.Where(t => !t.IsSystemObject).ToList();
                 foreach(StoredProcedure item in procedures) 
                 {
+                    var query = "";
                     try
                     {
                         var script = scripter.Script(new Urn[] { item.Urn });
 
-                        var query = "";
+                        
                         foreach (var line in script)
                         {
-                            query += line.AddNewLine();
+                            query += line.AddNewLine().AddGoBetweenBatch();
                         }
                         var result = server.ConnectionContext.ExecuteNonQuery(query);
                     }
                     catch (Exception ex)
                     {
+                        
+                        var logFileName = $"C:\\{_directory}\\{db.Name}\\StoredProcedures\\{item.Name}_ProcedureCreate_FailedScript.sql";
+                        File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
                     }
@@ -174,11 +182,12 @@ namespace SQLServerToSQLServer
                 
                 foreach (UserDefinedFunction item in functions)
                 {
+                    var query = "";
                     try
                     {
                         var script = scripter.Script(new Urn[] { item.Urn });
 
-                        var query = "";
+                        
                         foreach (var line in script)
                         {
                             query += line.AddNewLine();
@@ -187,6 +196,9 @@ namespace SQLServerToSQLServer
                     }
                     catch (Exception ex)
                     {
+                        
+                        var logFileName = $"C:\\{_directory}\\{db.Name}\\Functions\\{item.Name}_FunctionCreate_FailedScript.sql";
+                        File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
                     }
@@ -205,11 +217,12 @@ namespace SQLServerToSQLServer
                 views = views.Where(t => !t.IsSystemObject).ToList();
                 foreach(View item in views)
                 {
+                    var query = "";
                     try
                     {
                         var script = scripter.Script(new Urn[] { item.Urn });
 
-                        var query = "";
+                        
                         foreach (var line in script)
                         {
                             query += line.AddNewLine();
@@ -218,6 +231,9 @@ namespace SQLServerToSQLServer
                     }
                     catch (Exception ex)
                     {
+                        
+                        var logFileName = $"C:\\{_directory}\\{db.Name}\\Views\\{item.Name}_ViewCreate_FailedScript.sql";
+                        File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
                     }
@@ -237,11 +253,12 @@ namespace SQLServerToSQLServer
                 //tables = tables.Where(t => !t.IsSystemObject).ToList();
                 foreach(Table item in tables)
                 {
+                    var query = "";
                     try
                     {
                         var script = scripter.Script(new Urn[] { item.Urn });
 
-                        var query = "";
+                        
                         foreach (var line in script)
                         {
                             query += line.AddNewLine();
@@ -250,6 +267,9 @@ namespace SQLServerToSQLServer
                     }
                     catch (Exception ex)
                     {
+                        
+                        var logFileName = $"C:\\{_directory}\\{db.Name}\\Tables\\{item.Name}_TableCreate_FailedScript.sql";
+                        File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
                     }
@@ -264,14 +284,14 @@ namespace SQLServerToSQLServer
             {
                 ServerConnection serverConnection = new ServerConnection(sqlConnection);
                 Server server = new Server(serverConnection);
-                
+                var query = "";
                 foreach (UserDefinedType item in types)
                 {
                     try
                     {
                         var script = scripter.Script(new Urn[] { item.Urn });
 
-                        var query = "";
+                        
                         foreach (var line in script)
                         {
                             query += line.AddNewLine();
@@ -299,21 +319,22 @@ namespace SQLServerToSQLServer
             {
                 ServerConnection serverConnection = new ServerConnection(sqlConnection);
                 Server server = new Server(serverConnection);
+                var query = "";
                 try
                 {
-                    var query = "";
+                    
                     foreach (var line in dbScript)
                     {
                         query += line.AddNewLine();
                     }
                     var result = server.ConnectionContext.ExecuteNonQuery(query.ToCleanStatement(db.Name));
-                    //if (result > 0)
-                    //{
-                    //    Console.WriteLine($"{result} results from running {line}");
-                    //}
+         
                 }
                 catch (Exception ex)
                 {
+                    
+                    var queryFileName = $"C:\\{_directory}\\{db.Name}\\{db.Name}_DatabaseCreate_FailedScript.sql";
+                    File.WriteAllText(queryFileName, query.ToCleanStatement(db.Name));
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine(ex.InnerException);
                     Console.ForegroundColor = ConsoleColor.DarkCyan;
@@ -323,6 +344,19 @@ namespace SQLServerToSQLServer
                 
             }
             
+        }
+
+        private static void CreateDBFolderForErrors(Database db)
+        {
+            var folder = @$"{_directory}\{db.Name}";
+            if (!Directory.Exists(folder))
+            {
+                Directory.CreateDirectory(folder);
+                Directory.CreateDirectory($"{folder}\\Tables");
+                Directory.CreateDirectory($"{folder}\\Views");
+                Directory.CreateDirectory($"{folder}\\Functions");
+                Directory.CreateDirectory($"{folder}\\StoredProcedures");
+            }
         }
 
         private static void SetToServerConnectionString(string connectionString)
