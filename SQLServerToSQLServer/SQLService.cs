@@ -17,7 +17,7 @@ namespace SQLServerToSQLServer
         private static string? _connectionString;
         private static int _errorCount;
         private static string? _directory;
-        public static void CopySQLInstance(string fromServer,string toServer, string directory)
+        public static void CopySQLInstance(string fromServer,string toServer, string directory,string mdfFile, string ldfFile)
         {
             string connectionString = $"Server={fromServer};Database=master;Integrated Security=True;Trust Server Certificate=True;";
             SetToServerConnectionString($"Server={toServer};Database=master;Integrated Security=True;Trust Server Certificate=True;");
@@ -91,7 +91,7 @@ namespace SQLServerToSQLServer
                             var types = db.UserDefinedTypes;
 
 
-                            CreateDatabase(db, scripter);
+                            CreateDatabase(db, scripter, mdfFile, ldfFile);
                             if (tables.Count > 0)
                             {
                                 Console.WriteLine("Creating Tables.");
@@ -162,7 +162,7 @@ namespace SQLServerToSQLServer
                     catch (Exception ex)
                     {
                         
-                        var logFileName = $"C:\\{_directory}\\{db.Name}\\StoredProcedures\\{item.Name}_ProcedureCreate_FailedScript.sql";
+                        var logFileName = $"{_directory}\\{db.Name}\\StoredProcedures\\{item.Name}_ProcedureCreate_FailedScript.sql";
                         File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
@@ -197,7 +197,7 @@ namespace SQLServerToSQLServer
                     catch (Exception ex)
                     {
                         
-                        var logFileName = $"C:\\{_directory}\\{db.Name}\\Functions\\{item.Name}_FunctionCreate_FailedScript.sql";
+                        var logFileName = $"{_directory}\\{db.Name}\\Functions\\{item.Name}_FunctionCreate_FailedScript.sql";
                         File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
@@ -232,7 +232,7 @@ namespace SQLServerToSQLServer
                     catch (Exception ex)
                     {
                         
-                        var logFileName = $"C:\\{_directory}\\{db.Name}\\Views\\{item.Name}_ViewCreate_FailedScript.sql";
+                        var logFileName = $"{_directory}\\{db.Name}\\Views\\{item.Name}_ViewCreate_FailedScript.sql";
                         File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
@@ -268,7 +268,7 @@ namespace SQLServerToSQLServer
                     catch (Exception ex)
                     {
                         
-                        var logFileName = $"C:\\{_directory}\\{db.Name}\\Tables\\{item.Name}_TableCreate_FailedScript.sql";
+                        var logFileName = $"{_directory}\\{db.Name}\\Tables\\{item.Name}_TableCreate_FailedScript.sql";
                         File.WriteAllText(logFileName, query);
                         Log.Error(ex.InnerException, ex.Message);
                         _errorCount++;
@@ -310,7 +310,7 @@ namespace SQLServerToSQLServer
             
     
 
-        public static void CreateDatabase(Database db,Scripter scripter)
+        public static void CreateDatabase(Database db,Scripter scripter, string mdf, string ldf)
         {
             
             var dbScript = scripter.Script(new Urn[] { db.Urn });
@@ -327,13 +327,13 @@ namespace SQLServerToSQLServer
                     {
                         query += line.AddNewLine();
                     }
-                    var result = server.ConnectionContext.ExecuteNonQuery(query.ToCleanStatement(db.Name));
+                    var result = server.ConnectionContext.ExecuteNonQuery(query.ToCleanCreateDatabaseStatement(db.Name, mdf, ldf));
          
                 }
                 catch (Exception ex)
                 {
                     
-                    var queryFileName = $"C:\\{_directory}\\{db.Name}\\{db.Name}_DatabaseCreate_FailedScript.sql";
+                    var queryFileName = $"{_directory}\\{db.Name}\\{db.Name}_DatabaseCreate_FailedScript.sql";
                     File.WriteAllText(queryFileName, query.ToCleanStatement(db.Name));
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine(ex.InnerException);
