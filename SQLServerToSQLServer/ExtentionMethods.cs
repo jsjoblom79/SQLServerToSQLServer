@@ -31,27 +31,16 @@ namespace SQLServerToSQLServer
         public static string ToCleanCreateDatabaseStatement(this string statement, string databaseName, string mdf, string ldf)
         {
             string mdfPattern = @"[A-Z]:\\.*?\.mdf";
-            string fullndfPattern = @"[A-Z]:\\.*_\d+\.ndf";
-            string ndfPattern = @"_(\d+)\.ndf";
+            string ndfPattern = @"FILENAME = N'(.*?\\)([^\\]+\.ndf)'";
             string ldfPattern = @"[A-Z]:\\.*?\.ldf";
             string batch = @"IF\s*\(\s*1\s*=\s*FULLTEXTSERVICEPROPERTY";
-            //string use = @"USE\s*\[\w+\]";
-            //string mdf = $"E:\\Program Files\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQL\\DATA\\{databaseName}.mdf";
-            //string ldf = $"F:\\Program Files\\Microsoft SQL Server\\MSSQL16.MSSQLSERVER\\MSSQL\\Data\\{databaseName}_log.ldf";
-            var mdfFileName = Path.GetFileNameWithoutExtension(mdf);
+            var mdfFileName = Path.GetFileNameWithoutExtension(mdf); 
             mdf = mdf.Replace(mdfFileName, databaseName);
             var ldfFileName = Path.GetFileNameWithoutExtension(ldf);
             ldf = ldf.Replace(ldfFileName, databaseName + "_log");
-            
-            MatchCollection matches = Regex.Matches(statement,ndfPattern, RegexOptions.IgnoreCase);
 
-            foreach (Match match in matches)
-            {
-                var path = Path.GetDirectoryName(mdf);
-                var fwe = Path.GetFileNameWithoutExtension(mdf);
-                var newPath = path + "\\" + fwe + match.Value;
-                statement = Regex.Replace(statement,fullndfPattern, newPath,RegexOptions.IgnoreCase);
-            }
+            var newPath = Path.GetDirectoryName(mdf);
+            statement = Regex.Replace(statement, ndfPattern, m => $"FILENAME = N'{newPath}\\{m.Groups[2].Value}'", RegexOptions.IgnoreCase);
 
             var resultString = Regex.Replace(statement, mdfPattern, mdf, RegexOptions.IgnoreCase);
             resultString = Regex.Replace(resultString, ldfPattern, ldf, RegexOptions.IgnoreCase);
